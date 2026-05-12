@@ -1,132 +1,103 @@
 package com.example.myapplication
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-
-// ✅ Data Model
-data class Note(
-    val title: String,
-    val description: String
-)
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.myapplication.data.local.NoteDatabase
+import com.example.myapplication.repository.NoteRepository
+import com.example.myapplication.ui.screens.DetailScreen
+import com.example.myapplication.ui.screens.EditNoteScreen
+import com.example.myapplication.ui.screens.HomeScreen
+import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.example.myapplication.viewmodel.NoteViewModel
+import com.example.myapplication.viewmodel.NoteViewModelFactory
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        val database = NoteDatabase.getDatabase(this)
+        val repository = NoteRepository(database.noteDao())
+        val factory = NoteViewModelFactory(repository)
+
         setContent {
-            NotesAppUI()
-        }
-    }
-}
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun NotesAppUI() {
+            MyApplicationTheme {
 
-    // 🔹 State
-    var title by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    val notes = remember { mutableStateListOf<Note>() }
-    val context = LocalContext.current
+                val viewModel: NoteViewModel = viewModel(
+                    factory = factory
+                )
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Notes App") }
-            )
-        }
-    ) { innerPadding ->
+                val navController = rememberNavController()
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp)
-        ) {
+                NavHost(
+                    navController = navController,
+                    startDestination = "home"
+                ) {
 
-            // 🔹 Title Input
-            TextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Title") },
-                modifier = Modifier.fillMaxWidth()
-            )
+                    composable("home") {
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // 🔹 Description Input
-            TextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Description") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 🔹 Button
-            Button(
-                onClick = {
-                    if (title.isEmpty() || description.isEmpty()) {
-                        Toast.makeText(
-                            context,
-                            "Fill all fields!",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } else {
-                        notes.add(Note(title, description))
-                        title = ""
-                        description = ""
+                        HomeScreen(
+                            viewModel = viewModel,
+                            navController = navController
+                        )
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Add Note")
-            }
 
-            Spacer(modifier = Modifier.height(20.dp))
+                    composable(
+                        "detail/{id}/{title}/{description}"
+                    ) { backStackEntry ->
 
-            // 🔹 Notes List
-            LazyColumn {
-                items(notes) { note ->
+                        val id =
+                            backStackEntry.arguments
+                                ?.getString("id")
+                                ?.toInt() ?: 0
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp)
-                            .clickable {
-                                Toast.makeText(
-                                    context,
-                                    "Clicked: ${note.title}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        val title =
+                            backStackEntry.arguments
+                                ?.getString("title") ?: ""
 
-                            Text(
-                                text = note.title,
-                                style = MaterialTheme.typography.titleMedium
-                            )
+                        val description =
+                            backStackEntry.arguments
+                                ?.getString("description") ?: ""
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                        DetailScreen(
+                            id = id,
+                            title = title,
+                            description = description,
+                            navController = navController,
+                            viewModel = viewModel
+                        )
+                    }
 
-                            Text(
-                                text = note.description,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
+                    composable(
+                        "edit/{id}/{title}/{description}"
+                    ) { backStackEntry ->
+
+                        val id =
+                            backStackEntry.arguments
+                                ?.getString("id")
+                                ?.toInt() ?: 0
+
+                        val title =
+                            backStackEntry.arguments
+                                ?.getString("title") ?: ""
+
+                        val description =
+                            backStackEntry.arguments
+                                ?.getString("description") ?: ""
+
+                        EditNoteScreen(
+                            id = id,
+                            oldTitle = title,
+                            oldDescription = description,
+                            viewModel = viewModel,
+                            navController = navController
+                        )
                     }
                 }
             }
